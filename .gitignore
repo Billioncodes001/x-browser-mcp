@@ -1,4 +1,8 @@
 node_modules/
+.runtime/
+dashboard-dist/
+test-results/
+playwright-report/
 dist/
 .env
 .env.*
@@ -14,6 +18,7 @@ playwright/.auth/
 *.zip
 *.har
 *.png
+!dashboard/public/research-desk.png
 *.webm
 storage-state*.json
 cookies*.json

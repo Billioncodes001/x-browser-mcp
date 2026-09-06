@@ -1,5 +1,25 @@
 # Validation record
 
+## v0.2 dashboard — 2026-09-06
+
+Validated on Windows using Node.js 24.16.0 and Playwright 1.63.0's managed Chromium. The adapter now selects the full Chromium channel for headless operation; a separate headless-shell download is unnecessary.
+
+- Strict server and React/TypeScript production builds pass.
+- **41 tests pass:** 20 real Chromium tests using intercepted synthetic X pages, 15 core/service/storage tests, and 6 local HTTP/security/persistence tests.
+- **Six dashboard browser scenarios pass:** every route, saved setup and session controls, saved-search execution, record inspection and CSV download, direct collection and comparisons, action preview/confirmation/receipts, mobile keyboard focus and Escape dismissal.
+- Five viewport widths checked: 320, 390, 768, 1024 and 1440 pixels. Final desktop and phone screenshots were visually inspected after animations settled.
+- Automated axe checks report zero WCAG A/AA violations on the overview at desktop and phone widths. This is a bounded automated check, not a complete accessibility certification.
+- The protocol test starts **MCP and dashboard in one process**, discovers 24 tools, accesses the guide/prompt, exercises validation and writes-disabled behavior, and verifies that an MCP-saved search appears in the dashboard API.
+- HTTP tests cover request-token, Origin, Host and fetch-metadata guards; payload limits; private/traversal path rejection; persistent settings and environment precedence; safe CSV exports; action confirmation, replay prevention and uncertain receipts.
+- `npm audit --omit=dev`: zero known production dependency vulnerabilities at validation time.
+- The actual standalone dashboard starts on `127.0.0.1:8792` without opening or modifying an X account.
+
+Dashboard browser scenarios use a temporary backend with a **simulated X adapter**. Existing adapter tests use real Chromium with intercepted synthetic X pages. No real posts, replies, likes or follows were sent. Test data, profiles and session tokens are excluded from the source repository.
+
+Live signed-in X extraction and desired write workflows still require acceptance testing with a designated account and explicitly authorized actions. This remains an alpha, and collections remain bounded samples. CI independently runs the complete suite on Windows and Linux; browser reports and screenshots are attached to each run.
+
+## Historical v0.1 validation
+
 Date: 2026-09-05 (America/Los_Angeles)
 
 ## Completed locally

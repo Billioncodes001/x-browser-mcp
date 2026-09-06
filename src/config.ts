@@ -1,6 +1,15 @@
 import { homedir } from 'node:os';
 import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
+import { readFileSync } from 'node:fs';
+
+export const preferencesSchema = z.object({
+  browserChannel: z.enum(['chromium', 'chrome', 'msedge']).default('chromium'),
+  headless: z.boolean().default(false),
+  enableWrites: z.boolean().default(false),
+  delayMs: z.number().int().min(500).max(10000).default(1250),
+}).strict();
+export const preferenceEnvironment = { browserChannel: ['X_BROWSER_CHANNEL', 'X_BROWSER_EXECUTABLE_PATH', 'X_BROWSER_CDP_URL'], headless: ['X_BROWSER_HEADLESS'], enableWrites: ['X_BROWSER_ENABLE_WRITES'], delayMs: ['X_BROWSER_DELAY_MS'] };
 
 export type Config = {
   dataDir: string;
@@ -26,6 +35,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     return resolve(value);
   };
   const dataDir = absolute('X_BROWSER_DATA_DIR', resolve(homedir(), '.x-browser-mcp'));
+  let preferences = preferencesSchema.parse({});
+  try { preferences = preferencesSchema.parse(JSON.parse(readFileSync(resolve(dataDir, 'dashboard-settings.json'), 'utf8'))); }
+  catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error('Cannot read dashboard-settings.json; check its JSON and supported settings.'); }
+  const savedEnv = { X_BROWSER_HEADLESS: String(preferences.headless), X_BROWSER_ENABLE_WRITES: String(preferences.enableWrites), X_BROWSER_DELAY_MS: String(preferences.delayMs),
+    ...(!env.X_BROWSER_CDP_URL && !env.X_BROWSER_EXECUTABLE_PATH && preferences.browserChannel !== 'chromium' ? { X_BROWSER_CHANNEL: preferences.browserChannel } : {}) };
+  env = { ...savedEnv, ...env };
   const channel = z.enum(['chrome', 'msedge']).optional().parse(env.X_BROWSER_CHANNEL);
   const cdpUrl = env.X_BROWSER_CDP_URL;
   const executablePath = env.X_BROWSER_EXECUTABLE_PATH ? absolute('X_BROWSER_EXECUTABLE_PATH', '') : undefined;

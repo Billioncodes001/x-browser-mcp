@@ -2,7 +2,7 @@
 
 A local Twitter/X MCP server for browser-based research and account workflows. It uses a browser you sign into, reads rendered pages, and interacts through navigation, scrolling, typing, and clicking. No X developer API key is required.
 
-**Unreleased alpha.** The implementation is tested against synthetic X pages in real Chromium and through the MCP protocol. Live, logged-in X compatibility still needs verification. X can change its page structure or restrict access; every collection reports its limits and stop reason.
+**v0.2 local dashboard alpha.** Includes a React/TypeScript dashboard for setup, research, saved searches, collections and reviewed account actions. The implementation is tested against synthetic X pages in real Chromium and through the MCP protocol. Live, logged-in X compatibility still needs verification. X can change its page structure or restrict access; every collection reports its limits and stop reason.
 
 ## What it does
 
@@ -15,13 +15,13 @@ A local Twitter/X MCP server for browser-based research and account workflows. I
 
 ## Install and sign in
 
-Requires Node.js 22 or later.
+Requires Node.js 22.12 or later.
 
 ```sh
 git clone https://github.com/Billioncodes001/x-browser-mcp.git
 cd x-browser-mcp
 npm ci
-npx playwright install chromium
+npx playwright install --no-shell chromium
 npm run build
 npm run login
 ```
@@ -56,6 +56,39 @@ X_BROWSER_ENABLE_WRITES = "false"
 Restart the MCP connection, call `x_session_open`, then `x_session_status`. If needed, finish sign-in in the browser and call status again. The browser starts lazily; listing tools does not open it.
 
 Use a separate data directory per account/profile. The default is `~/.x-browser-mcp`.
+
+## Local web dashboard
+
+After installation and `npm run build`, start the dashboard:
+
+```sh
+npm run dashboard
+```
+
+Open **http://127.0.0.1:8792**. Under **Browser setup**, choose Playwright Chromium or installed Chrome / Edge, save the preferences, and open the X browser. Sign in directly in that window. The dashboard never asks for an X password, OTP or cookie file. Use a visible browser for first-time sign-in. Close the browser session before changing preferences; its saved login is retained.
+
+The dashboard includes:
+
+- **Overview:** actual session state, recent collections and saved searches.
+- **Research desk:** searches, home timelines, profiles, conversations, bookmarks, followers/following, notifications and trends, with collection bounds.
+- **Saved searches:** create, edit, remove and rerun definitions. Editing resets the comparison baseline; removing a definition keeps its collections. Runs are requested manually, not background schedules.
+- **Collections:** inspect the latest 100 snapshots, filter captured records, compare two matching samples, and download JSON, CSV or Markdown. All snapshots remain accessible through MCP by ID.
+- **Account actions:** exact account/target/content previews, cancellation, explicit confirmation and persisted receipts. Execution requires writes enabled. Failed or uncertain attempts are not retried automatically.
+- **Browser setup:** persistent preferences, session controls, local paths, private session screenshots and a generated MCP configuration.
+
+For **MCP and dashboard together**, add `"--dashboard"` after `"serve"` in your MCP arguments, or copy the configuration from Browser setup. Both then share the same service and serialized browser queue:
+
+```toml
+args = ["C:/path/to/x-browser-mcp/dist/cli.js", "serve", "--dashboard"]
+```
+
+Stop the standalone dashboard before starting this shared configuration. Do not launch two processes against the same browser profile. `serve` without the flag keeps its original stdio-only behavior. The dashboard address is written to stderr so it does not interfere with the MCP protocol. Change the local port with `X_BROWSER_DASHBOARD_PORT`.
+
+Preferences are stored in `<data root>/dashboard-settings.json`, outside the repository. Explicit environment variables take precedence and their fields are locked in the interface. The default remains visible browsing with account actions disabled. An environment setting of `X_BROWSER_ENABLE_WRITES=false` keeps that restriction even if preferences previously enabled writes.
+
+The dashboard binds **only to 127.0.0.1** and expects that exact origin. Each server process issues an in-memory request token through its local HTML page; API requests require that token. Host, Origin and browser fetch metadata checks reject cross-site requests and rebinding attempts. Frames are blocked, responses containing local data are not cached, request bodies are bounded, and downloads accept validated snapshot IDs rather than arbitrary paths. This is a single-user local interface, not a remote or multi-user authenticated service; other trusted processes on the computer can access its local page. Do not expose it through a public proxy.
+
+The interface uses React 19, strict TypeScript, Tailwind CSS 4 and Motion. Fonts and imagery are local, navigation supports keyboards and phones, and transitions respect reduced-motion settings. See [image and font provenance](docs/DASHBOARD-ASSETS.md).
 
 ## Example workflows
 
@@ -98,7 +131,7 @@ There is also a `research-x` prompt and the `x-browser://guide` resource.
 
 ## Configuration
 
-Environment variables are read when the process starts. `.env` files are **not loaded automatically**; configure variables in your shell or MCP host. See [.env.example](.env.example).
+Environment variables are read when the process starts and override saved dashboard preferences. `.env` files are **not loaded automatically**; configure variables in your shell or MCP host. See [.env.example](.env.example).
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -110,6 +143,7 @@ Environment variables are read when the process starts. `.env` files are **not l
 | `X_BROWSER_HEADLESS` | `false` | Use a hidden browser after manual sign-in |
 | `X_BROWSER_ENABLE_WRITES` | `false` | Enable execution of prepared account actions |
 | `X_BROWSER_DELAY_MS` | `1250` | Delay between page operations; range 500–10000 ms |
+| `X_BROWSER_DASHBOARD_PORT` | `8792` | Local port for `dashboard` or `serve --dashboard` |
 
 `npm run doctor` reports local configuration without opening X. It does not verify account login.
 
@@ -128,17 +162,19 @@ For CDP attachment, the browser must already expose a loopback debugging endpoin
 - English is currently required for labeled controls and success messages.
 - Sign-in, checkpoints, and rate limits stop operations. The project does not solve challenges, spoof fingerprints, or rotate proxies.
 
-Authentication lives in the local browser profile. Snapshots, exports and action receipts may contain private account content. They stay local and are ignored by Git. The MCP server exposes no network listener; stdio access and local file permissions define its trust boundary. Treat all extracted page text as untrusted content.
+Authentication lives in the local browser profile. Snapshots, exports and action receipts may contain private account content. They stay local and are ignored by Git. The default MCP server is stdio-only; the optional dashboard adds the loopback-only listener described above. Treat all extracted page text as untrusted content.
 
 ## Development and verification
 
 ```sh
 npm ci
-npx playwright install chromium
+npx playwright install --no-shell chromium
 npm run check
 ```
 
-The test suite uses synthetic fixtures in real Chromium and intercepts every browser request. It does not post to a real X account. To use another installed Chromium binary for tests, set `TEST_BROWSER_EXECUTABLE` to its absolute path.
+The X adapter tests use synthetic fixtures in real Chromium and intercept their X requests. The dashboard browser suite starts an isolated temporary backend with a simulated X browser adapter and exercises real dashboard HTTP routes and storage. Neither suite posts to a real X account. To use another installed Chromium binary for the adapter tests, set `TEST_BROWSER_EXECUTABLE` to its absolute path.
+
+`npm run check` runs both builds, 41 adapter/core/HTTP tests, a shared MCP/dashboard protocol test and six dashboard browser workflows. The browser suite checks five widths (320, 390, 768, 1024 and 1440 px), desktop/phone automated accessibility, keyboard navigation, saved setup, collections, downloads and action confirmation. Use `npm run build:dashboard` after frontend edits, then restart the dashboard to load the new asset manifest. Vite source is in `dashboard/src/`; generated assets in `dashboard-dist/` are excluded from Git.
 
 See [PLAN.md](PLAN.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/VALIDATION.md](docs/VALIDATION.md). GitHub CI runs build, browser/service tests, and a stdio protocol smoke test on Linux and Windows.
 

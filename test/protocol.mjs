@@ -9,8 +9,8 @@ import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotoc
 const data = await mkdtemp(resolve(tmpdir(), 'x-browser-mcp-protocol-'));
 const client = new Client({ name:'protocol-test',version:'1.0.0' });
 const transport = new StdioClientTransport({
-  command:process.execPath, args:[fileURLToPath(new URL('../dist/cli.js',import.meta.url)),'serve'],
-  env:{...getDefaultEnvironment(),X_BROWSER_DATA_DIR:data,X_BROWSER_ENABLE_WRITES:'false'}, stderr:'pipe',
+  command:process.execPath, args:[fileURLToPath(new URL('../dist/cli.js',import.meta.url)),'serve','--dashboard'],
+  env:{...getDefaultEnvironment(),X_BROWSER_DATA_DIR:data,X_BROWSER_ENABLE_WRITES:'false',X_BROWSER_DASHBOARD_PORT:'0'}, stderr:'pipe',
 });
 let stderr=''; transport.stderr?.on('data', d => { stderr+=d; });
 try {
@@ -24,6 +24,12 @@ try {
   assert.notEqual(saved.isError,true);
   const searches = await client.callTool({name:'x_saved_search_list',arguments:{}});
   assert.equal(searches.structuredContent.items[0].query,'from:openai');
+  const dashboard=stderr.match(/X Browser dashboard: (http:\/\/127\.0\.0\.1:\d+)/)?.[1];
+  assert.ok(dashboard,'Shared dashboard announced on stderr without polluting MCP stdout');
+  const html=await (await fetch(dashboard)).text();
+  const token=html.match(/name="dashboard-token" content="([a-f0-9]+)"/)?.[1];assert.ok(token);
+  const dashboardState=await (await fetch(dashboard+'/api/state',{headers:{'X-Dashboard-Token':token}})).json();
+  assert.equal(dashboardState.mode,'shared');assert.equal(dashboardState.searches[0].query,'from:openai');
   const blocked = await client.callTool({name:'x_action_execute',arguments:{id:'d9929592-8c9a-4b56-a7d7-1e324a28a5de'}});
   assert.equal(blocked.isError,true); assert.equal(blocked.structuredContent.code,'WRITES_DISABLED');
   const bad = await client.callTool({name:'x_search',arguments:{query:'hello',limit:99999}});

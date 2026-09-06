@@ -24,7 +24,7 @@ export class XBrowser implements BrowserPort {
       await mkdir(this.config.profileDir, { recursive: true, mode: 0o700 });
       try {
         this.context = await this.launch(this.config.profileDir, {
-          headless: this.config.headless, channel: this.config.browserChannel, executablePath: this.config.executablePath,
+          headless: this.config.headless, channel: this.config.browserChannel ?? 'chromium', executablePath: this.config.executablePath,
           viewport: { width: 1440, height: 1000 }, locale: 'en-US',
           args: ['--lang=en-US'],
         });

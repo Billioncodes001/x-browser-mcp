@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, realpath, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, realpath, rename, writeFile, unlink } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { relative, resolve, sep } from 'node:path';
 import { nameSchema } from './validation.js';
@@ -77,6 +77,13 @@ export class ArtifactStore {
   }
   async saveSearch(search: SavedSearch) { await this.put('searches', `${nameSchema.parse(search.name)}.json`, search); return search; }
   async search(name: string): Promise<SavedSearch> { return JSON.parse(await readFile(await this.path('searches', `${nameSchema.parse(name)}.json`), 'utf8')); }
+  async deleteSearch(name: string) { await unlink(await this.path('searches', `${nameSchema.parse(name)}.json`)); return { deleted: name }; }
+  async listReceipts() {
+    const directory = resolve(await this.path('receipts', 'probe'), '..');
+    const records: Array<Record<string, unknown>> = [];
+    for (const file of await readdir(directory)) if (file.endsWith('.json') && idPattern.test(file.slice(0,-5))) records.push(await this.receipt(file.slice(0,-5)) as Record<string, unknown>);
+    return records.sort((a,b) => String(b.attemptedAt).localeCompare(String(a.attemptedAt))).slice(0,100);
+  }
   async listSearches(): Promise<SavedSearch[]> {
     const directory = resolve(await this.path('searches', 'probe'), '..');
     const result: SavedSearch[] = [];

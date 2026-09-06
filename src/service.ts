@@ -83,4 +83,8 @@ export class XService {
     });
   }
   cancel(id: string) { return this.queue.run(async () => ({ cancelled: this.pending.delete(id), id })); }
+  preparedActions() { return this.queue.run(async () => {
+    for (const [id, action] of this.pending) if (Date.parse(action.expiresAt) <= Date.now()) this.pending.delete(id);
+    return [...this.pending.values()];
+  }); }
 }

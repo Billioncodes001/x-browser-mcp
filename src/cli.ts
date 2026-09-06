@@ -8,28 +8,31 @@ import { ArtifactStore } from './store.js';
 import { XService } from './service.js';
 import { createServer } from './server.js';
 import { errorInfo } from './errors.js';
+import { startDashboard } from './dashboard.js';
 
 async function main() {
   const command = process.argv[2] ?? 'serve';
   if (['--help', '-h', 'help'].includes(command)) {
-    process.stdout.write('X Browser MCP\n\nCommands:\n  serve                 Start the stdio MCP server (default)\n  login                 Open a visible browser for manual X sign-in\n  doctor                Check local setup without opening X\n  run-search <name>      Run a saved search once, emit JSON, then close\n\nSee README.md for configuration and Codex setup.\n');
+    process.stdout.write('X Browser MCP\n\nCommands:\n  serve                 Start the stdio MCP server (default)\n  serve --dashboard     Share one session between MCP and the local dashboard\n  dashboard             Start the standalone local dashboard on port 8792\n  login                 Open a visible browser for manual X sign-in\n  doctor                Check local setup without opening X\n  run-search <name>      Run a saved search once, emit JSON, then close\n\nSet X_BROWSER_DASHBOARD_PORT to choose a local port.\nSee README.md for configuration and Codex setup.\n');
     return;
   }
   const config = loadConfig();
   const browser = new XBrowser(command === 'login' ? { ...config, headless: false } : config);
   const service = new XService(browser, new ArtifactStore(config.dataDir), config);
+  let dashboard: Awaited<ReturnType<typeof startDashboard>> | undefined;
   let shuttingDown = false;
   const shutdown = async () => {
     if (shuttingDown) return;
     shuttingDown = true;
     await browser.close().catch(() => undefined);
+    await dashboard?.close().catch(() => undefined);
     process.exit(0);
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
   if (command === 'doctor') {
     const browserInstalled = await access(config.executablePath ?? chromium.executablePath()).then(() => true, () => false);
-    process.stdout.write(JSON.stringify({ version: '0.1.0', node: process.version, dataDir: config.dataDir, profileDir: config.profileDir, browser: config.cdpUrl ? 'attached loopback CDP' : config.browserChannel ?? config.executablePath ?? 'chromium', configuredExecutableAvailable: browserInstalled, writesEnabled: config.enableWrites, liveSessionChecked: false, next: 'Run npm run login, then connect this server to your MCP host.' }, null, 2) + '\n');
+    process.stdout.write(JSON.stringify({ version: '0.2.0', node: process.version, dataDir: config.dataDir, profileDir: config.profileDir, browser: config.cdpUrl ? 'attached loopback CDP' : config.browserChannel ?? config.executablePath ?? 'chromium', configuredExecutableAvailable: browserInstalled, writesEnabled: config.enableWrites, liveSessionChecked: false, next: 'Run npm run login, then connect this server to your MCP host.' }, null, 2) + '\n');
     return;
   }
   if (command === 'login') {
@@ -53,6 +56,11 @@ async function main() {
     finally { await browser.close(); }
     if (config.cdpUrl) process.exit(process.exitCode ?? 0);
     return;
+  }
+  if (command === 'dashboard' || (command === 'serve' && process.argv.includes('--dashboard'))) {
+    dashboard = await startDashboard(service,{port:Number(process.env.X_BROWSER_DASHBOARD_PORT ?? 8792),mode:command === 'serve' ? 'shared' : 'standalone'});
+    process.stderr.write(`X Browser dashboard: ${dashboard.url}\n`);
+    if (command === 'dashboard') return;
   }
   if (command !== 'serve') throw new Error('Unknown command. Run x-browser-mcp --help.');
   const server = createServer(service);
