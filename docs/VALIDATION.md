@@ -1,5 +1,16 @@
 # Validation record
 
+## Dashboard theme update — 2026-09-06
+
+The research workspace now uses graphite, warm white and burnt orange across its navigation, buttons, links, fields, focus indicators and logo. Success status indicators retain green.
+
+- React/TypeScript production build and all six existing dashboard browser scenarios pass locally on Windows.
+- Layout checks cover 320, 390, 768, 1024 and 1440 pixels; desktop and phone screenshots were visually inspected.
+- Automated axe WCAG A/AA checks report zero violations on the overview at desktop and phone widths. Keyboard navigation and reduced-motion checks pass.
+- The restarted standalone dashboard serves the new build at `127.0.0.1:8792`; overview and setup render without runtime errors.
+
+This validation covers the theme change. The complete backend and protocol validation below records the preceding dashboard baseline.
+
 ## v0.2 dashboard — 2026-09-06
 
 Validated on Windows using Node.js 24.16.0 and Playwright 1.63.0's managed Chromium. The adapter now selects the full Chromium channel for headless operation; a separate headless-shell download is unnecessary.
@@ -16,7 +27,7 @@ Validated on Windows using Node.js 24.16.0 and Playwright 1.63.0's managed Chrom
 
 Dashboard browser scenarios use a temporary backend with a **simulated X adapter**. Existing adapter tests use real Chromium with intercepted synthetic X pages. No real posts, replies, likes or follows were sent. Test data, profiles and session tokens are excluded from the source repository.
 
-Live signed-in X extraction and desired write workflows still require acceptance testing with a designated account and explicitly authorized actions. This remains an alpha, and collections remain bounded samples. CI independently runs the complete suite on Windows and Linux; browser reports and screenshots are attached to each run. The final revision passed on both platforms: see the [machine-readable validation record](dashboard-validation.json) and [successful CI run](https://github.com/Billioncodes001/x-browser-mcp/actions/runs/34037650125).
+Live signed-in X extraction and desired write workflows still require acceptance testing with a designated account and explicitly authorized actions. This remains an alpha, and collections remain bounded samples. CI independently runs the complete suite on Windows and Linux; browser reports and screenshots are attached to each run. This baseline passed on both platforms: see the [machine-readable validation record](dashboard-validation.json) and [successful CI run](https://github.com/Billioncodes001/x-browser-mcp/actions/runs/34037650125).
 
 ## Historical v0.1 validation
 
