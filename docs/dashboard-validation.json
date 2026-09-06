@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "passed": true,
+  "tested_code_commit": "cec0033e3acc00cd76f6397fc423f93035c6d8a0",
+  "ci_url": "https://github.com/Billioncodes001/x-browser-mcp/actions/runs/34037650125",
+  "core_adapter_http_tests": 41,
+  "mcp_tools_in_protocol_check": 24,
+  "shared_mcp_dashboard_protocol": "passed",
+  "browser_scenarios": {
+    "dashboard-windows-latest": {
+      "passed": 6,
+      "duration_ms": 18005
+    },
+    "dashboard-ubuntu-latest": {
+      "passed": 6,
+      "duration_ms": 15081
+    }
+  },
+  "local_browser_scenarios_passed": 6,
+  "viewports_px": [
+    320,
+    390,
+    768,
+    1024,
+    1440
+  ],
+  "automated_overview_wcag_violations": {
+    "desktop": 0,
+    "phone": 0
+  },
+  "visual_review": "Desktop and phone screenshots inspected after animations settled; distinct research masthead, horizontal navigation, Manrope typography and paper surfaces.",
+  "standalone_local_server": "Actual startup and live setup UI checked without opening an X account.",
+  "not_verified": [
+    "Live signed-in X extraction and current selectors",
+    "Live X account writes"
+  ],
+  "scope": "Real dashboard HTTP/storage and browser interaction tests with synthetic X data. No live posts, likes, follows or replies were sent."
+}

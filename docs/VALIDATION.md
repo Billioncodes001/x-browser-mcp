@@ -16,7 +16,7 @@ Validated on Windows using Node.js 24.16.0 and Playwright 1.63.0's managed Chrom
 
 Dashboard browser scenarios use a temporary backend with a **simulated X adapter**. Existing adapter tests use real Chromium with intercepted synthetic X pages. No real posts, replies, likes or follows were sent. Test data, profiles and session tokens are excluded from the source repository.
 
-Live signed-in X extraction and desired write workflows still require acceptance testing with a designated account and explicitly authorized actions. This remains an alpha, and collections remain bounded samples. CI independently runs the complete suite on Windows and Linux; browser reports and screenshots are attached to each run.
+Live signed-in X extraction and desired write workflows still require acceptance testing with a designated account and explicitly authorized actions. This remains an alpha, and collections remain bounded samples. CI independently runs the complete suite on Windows and Linux; browser reports and screenshots are attached to each run. The final revision passed on both platforms: see the [machine-readable validation record](dashboard-validation.json) and [successful CI run](https://github.com/Billioncodes001/x-browser-mcp/actions/runs/34037650125).
 
 ## Historical v0.1 validation
 
