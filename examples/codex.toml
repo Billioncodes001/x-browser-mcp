@@ -1,0 +1,11 @@
+[mcp_servers.x_browser]
+command = "node"
+args = ["C:/path/to/x-browser-mcp/dist/cli.js", "serve"]
+startup_timeout_sec = 30
+tool_timeout_sec = 180
+
+[mcp_servers.x_browser.env]
+X_BROWSER_ENABLE_WRITES = "false"
+X_BROWSER_HEADLESS = "false"
+# X_BROWSER_CHANNEL = "msedge"
+# X_BROWSER_DATA_DIR = "C:/Users/you/.x-browser-mcp"

@@ -1,0 +1,28 @@
+{
+  "name": "x-browser-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Twitter/X browser automation and research MCP server",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "bin": { "x-browser-mcp": "dist/cli.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/cli.js serve",
+    "login": "node dist/cli.js login",
+    "doctor": "node dist/cli.js doctor",
+    "test": "tsx --test --test-concurrency=1 test/*.test.ts",
+    "test:protocol": "node test/protocol.mjs",
+    "check": "npm run build && npm test && npm run test:protocol"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "playwright": "1.63.0",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
