@@ -36,6 +36,32 @@ test("all dashboard routes render and assets load without runtime errors", async
       .evaluate((e: HTMLImageElement) => e.complete && e.naturalWidth > 0),
   ).toBe(true);
   expect(errors).toEqual([]);
+  await page.route("**/api/state", (route) =>
+    route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      body: JSON.stringify({
+        message: "Reload the local dashboard to establish a new session.",
+      }),
+    }),
+  );
+  await page
+    .getByRole("button", { name: "Refresh workspace", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Reload the local dashboard",
+  );
+  await page.unroute("**/api/state");
+  await page
+    .getByRole("button", { name: "Reload workspace", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "A little more perspective.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).not.toBeVisible();
 });
 test("setup persists preferences and connects the fixture browser", async ({
   page,

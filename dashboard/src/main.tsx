@@ -42,7 +42,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import "@fontsource-variable/dm-sans";
+import "@fontsource-variable/manrope";
 import "@fontsource-variable/newsreader";
 import "@fontsource-variable/newsreader/wght-italic.css";
 import "./styles.css";
@@ -432,9 +432,9 @@ function Overview() {
         <div className="hero-copy">
           <p className="eyebrow">OBSERVE. COLLECT. UNDERSTAND.</p>
           <h2>
-            The conversation,
+            A clear view of
             <br />
-            <em>in context.</em>
+            <em>the conversation.</em>
           </h2>
           <p>
             Follow the subjects that matter. Gather original posts, compare
@@ -1874,8 +1874,8 @@ function App() {
         ) : (
           <p role="status">Opening your local workspace…</p>
         )}
-        <Button variant="secondary" onClick={() => void refresh()}>
-          Reconnect
+        <Button variant="secondary" onClick={() => location.reload()}>
+          Reload workspace
         </Button>
       </div>
     );
@@ -2005,7 +2005,16 @@ function App() {
           </div>
         </header>
         <main id="main-content" tabIndex={-1}>
-          {failure && <Notice tone="error">{failure}</Notice>}
+          {failure && (
+            <Notice tone="error">
+              <div className="reconnect-notice">
+                <span>{failure}</span>
+                <Button variant="secondary" onClick={() => location.reload()}>
+                  Reload workspace
+                </Button>
+              </div>
+            </Notice>
+          )}
           <motion.div
             className="page-content"
             key={route}

@@ -4,7 +4,7 @@ The dashboard serves its fonts, icons and image locally. No external image or fo
 
 - `dashboard/public/research-desk.png`: generated editorial illustration, 1536 × 1024 pixels. Created with the built-in image generation tool on 2026-09-06. It represents research materials, not a real newsroom or evidence for a claim. Original generated output is preserved; the repository contains a copy.
 - `dashboard/public/mark.svg`: project-created vector mark. It identifies this independent project and does not imply endorsement by X.
-- DM Sans and Newsreader: bundled through Fontsource. Their Open Font Licenses are reproduced in `dashboard/public/font-licenses.txt`.
+- Manrope and Newsreader: bundled through Fontsource. Their Open Font Licenses are reproduced in `dashboard/public/font-licenses.txt`.
 - Interface icons: Lucide, supplied by the `lucide-react` dependency under its license.
 
 ## Image prompt

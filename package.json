@@ -32,7 +32,7 @@
     "test:dashboard": "playwright test"
   },
   "dependencies": {
-    "@fontsource-variable/dm-sans": "^5.3.0",
+    "@fontsource-variable/manrope": "^5.3.0",
     "@fontsource-variable/newsreader": "^5.3.0",
     "@modelcontextprotocol/sdk": "1.30.0",
     "lucide-react": "^1.41.0",
