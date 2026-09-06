@@ -18,10 +18,10 @@ Date: 2026-09-05 (America/Los_Angeles)
 
 The download of the Playwright 1.63.0 Chromium build timed out. Browser tests used an already installed Playwright Chromium build 1223 via `TEST_BROWSER_EXECUTABLE`. Its use is explicit; no personal profile or cookies were imported. The default Playwright executable for this project still requires a successful browser installation, or an explicit channel/executable setting.
 
-Local test command (machine-specific):
+Test command when using an existing Chromium executable:
 
 ```powershell
-$env:TEST_BROWSER_EXECUTABLE = "C:/Users/jenes/AppData/Local/ms-playwright/chromium-1223/chrome-win64/chrome.exe"
+$env:TEST_BROWSER_EXECUTABLE = "C:/absolute/path/to/chrome.exe"
 npm run check
 ```
 
@@ -29,7 +29,6 @@ npm run check
 
 - Live, logged-in X extraction and selector verification. The available Edge X page was signed out.
 - Live write verification against a designated test account and specific authorized content. Fixture success is not a claim that every current X UI action works.
-- Linux/Windows GitHub CI execution after the repository is pushed; the workflow is supplied but has not run remotely.
-- Repository destination and upload. No GitHub destination was supplied during this build.
+- Linux/Windows GitHub CI is separate from this local validation record; see the repository's [Actions page](https://github.com/Billioncodes001/x-browser-mcp/actions) for current results.
 
 The current release should be treated as an alpha until live read verification and the desired account workflows are exercised.

@@ -41,11 +41,11 @@ Media uploads and alt text, quote posts, polls, lists and communities, analytics
 
 ## Repository destination
 
-Pending user-provided GitHub repository URL or new name/visibility. Local project: `x-browser-mcp`.
+Public repository: https://github.com/Billioncodes001/x-browser-mcp. Local project: `x-browser-mcp`.
 
 ## First implementation status
 
 - Implemented: 24 MCP tools, session handling, bounded DOM collections, saved searches, comparisons, exports, and prepared account actions.
 - Verified locally: strict build, 35 tests using browser fixtures and service checks, plus MCP protocol smoke test.
 - Supplied: CLI, Codex configuration example, architecture/usage docs, GitHub CI.
-- Pending: live logged-in X verification and GitHub upload destination. See `docs/VALIDATION.md` for the exact scope of testing.
+- Pending: live logged-in X verification. See `docs/VALIDATION.md` for the exact scope of testing.

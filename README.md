@@ -18,6 +18,8 @@ A local Twitter/X MCP server for browser-based research and account workflows. I
 Requires Node.js 22 or later.
 
 ```sh
+git clone https://github.com/Billioncodes001/x-browser-mcp.git
+cd x-browser-mcp
 npm ci
 npx playwright install chromium
 npm run build
