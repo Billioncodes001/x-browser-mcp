@@ -4,7 +4,7 @@
 
 **Turn the X pages you can access into organized, source-linked research.**
 
-X Browser MCP is a local Model Context Protocol server and web dashboard for researchers, analysts and account owners. Sign in to a dedicated browser, collect rendered posts and profiles, revisit saved searches, and export the records you observed. It navigates, scrolls, types and clicks through the browser; no X developer API key is required. An AI assistant can use its 24 MCP tools, or you can operate the dashboard directly.
+X Browser MCP is a local Model Context Protocol server and web dashboard for researchers, analysts and account owners. Sign in to a dedicated browser, collect rendered posts and profiles, revisit saved searches, and export the records you observed. It navigates, scrolls, types and clicks through the browser; no X developer API key is required. An AI assistant can use its 25 MCP tools, or you can operate the dashboard directly.
 
 **v0.2 local dashboard alpha.** Includes a React/TypeScript dashboard for setup, research, saved searches, collections and reviewed account actions. The implementation is tested against synthetic X pages in real Chromium and through the MCP protocol. Live, logged-in X compatibility still needs verification. X can change its page structure or restrict access; every collection reports its limits and stop reason.
 
@@ -29,6 +29,7 @@ This project collects observations; it does not fact-check them or provide a com
 - Save bounded, deduplicated collections as snapshots with original URLs and capture times.
 - Save reusable searches, rerun them, and compare newly observed or changed records.
 - Export snapshots as JSON, CSV, or Markdown. CSV exports protect against spreadsheet formula execution.
+- Prepare a selected-record research handoff from a saved snapshot: explicit review note, partial-result acknowledgement, source fingerprint, duplicate/exclusion counts and JSON or provenance-bearing CSV. This does not open X.
 - Prepare and execute text posts/replies, likes/unlikes, bookmarks/unbookmarks, reposts/undo reposts, and follows/unfollows, with account checks and action receipts.
 - Diagnose the session and capture a screenshot of the signed-in page.
 
@@ -97,7 +98,7 @@ The dashboard includes:
 - **Overview:** actual session state, recent collections and saved searches.
 - **Research desk:** searches, home timelines, profiles, conversations, bookmarks, followers/following, notifications and trends, with collection bounds.
 - **Saved searches:** create, edit, remove and rerun definitions. Editing resets the comparison baseline; removing a definition keeps its collections. Runs are requested manually, not background schedules.
-- **Collections:** inspect the latest 100 snapshots, filter captured records, compare two matching samples, and download JSON, CSV or Markdown. All snapshots remain accessible through MCP by ID.
+- **Collections:** inspect the latest 100 snapshots, filter captured records, compare two matching samples, and download raw JSON, CSV or Markdown. Prepare a separately reviewed selected-record handoff with provenance and coverage warnings. All snapshots remain accessible through MCP by ID.
 - **Account actions:** exact account/target/content previews, cancellation, explicit confirmation and persisted receipts. Execution requires writes enabled. Failed or uncertain attempts are not retried automatically.
 - **Browser setup:** persistent preferences, session controls, local paths, private session screenshots and a generated MCP configuration.
 
@@ -128,6 +129,55 @@ The equivalent MCP calls use these arguments after `x_session_open` and `x_sessi
 3. `x_export`: `{"snapshotId":"<returned snapshot UUID>","format":"csv"}`. The tool returns an absolute local export path; the dashboard downloads the file directly.
 
 Use `format: "json"` for downstream processing or `format: "md"` for a research note. Exporting a saved snapshot does not recollect X.
+
+### Review a selected-record handoff
+
+This is a local workflow for an **existing saved collection**. No X account, login, browser session or write permission is needed. In **Collections**, open a snapshot and choose **Prepare reviewed export**.
+
+1. Inspect the stop reason, original warnings, duplicate counts and source fingerprint. Every stop reason stays partial, including `limit` and `no_new_items`.
+2. Explicitly select the records to include; none are selected initially. Expand **Review all saved fields**, then write a 15-2000 character selection note. The original-record search filter does not change this selection.
+3. Acknowledge the partial-result warnings and download a **JSON evidence packet** or **CSV with provenance in every row**. Changing the note or selection clears acknowledgement. A failed download retains the note in the current page; a page reload discards the draft.
+
+The packet contains selected original fields, zero-based positions in the saved snapshot, source URL/key, capture time, configured bounds (unknown legacy bounds are `null`), scroll/stop metadata, SHA-256 of the original file bytes, selected/excluded counts, warnings, and the operator note/review time. CSV repeats that context on every row, carries original fields in `record_json`, and neutralizes formula-like cells. This is not redaction: source queries, labels, warnings and selected nested fields may contain sensitive context. Inspect the complete export before sharing.
+
+Exact duplicate IDs with identical fields collapse in original capture order; their original positions are retained. Conflicting copies of one ID are refused, not silently merged. Unknown IDs, empty selections, malformed/over-bound snapshots, missing acknowledgement and changed source fingerprints are refused before writing an export. For a stale source, reload the preview and select/review again. Raw exports and saved-search comparison remain unchanged.
+
+Snapshot validation retains the original JSON records rather than substituting a schema-generated clone. Own `__proto__`, `constructor` and nested fields remain inert evidence; differences in those fields prevent duplicate collapse. Invalid UTF-8 is rejected, not decoded with replacement characters.
+
+Equivalent MCP workflow, without `x_session_open`:
+
+```json
+{"snapshotId":"<saved snapshot UUID>"}
+```
+
+Call `x_review_export` with the above to get the preview. Show the selected evidence and warnings to the user, then call the same tool with their reviewed IDs and note:
+
+```json
+{
+  "snapshotId": "<same saved snapshot UUID>",
+  "review": {
+    "snapshotDigest": "<64-character digest returned by the preview>",
+    "recordIds": ["<selected record ID>"],
+    "note": "Why these observations belong in this partial research handoff.",
+    "acknowledgedPartial": true,
+    "format": "json"
+  }
+}
+```
+
+The tool returns a local file path; the dashboard downloads the same format. Files are written atomically under `<data root>/exports/` without modifying the snapshot. Each export creates a separate file; retries are not deduplicated. Review is an **operator declaration, not authenticated approval, source authenticity or fact-checking**. The fingerprint identifies snapshot bytes, not a signed trust claim. Records/selection order can be reproduced from that snapshot and selected IDs; review timestamps and output filenames change between exports.
+
+Limits: one snapshot, up to 200 saved records and 8 MiB of snapshot JSON. Reads use a regular-file handle, retain path/link checks, and consume at most 8 MiB plus one detection byte even if a file grows after its initial size check. Handles close on success and failure. An iterative preflight permits at most **64 nested JSON containers**, counting the snapshot root object as one, including arrays, unknown fields and inert keys. Deeper input is rejected before duplicate comparison or pretty-printing; no fields are flattened or removed.
+
+Reviewed JSON and CSV each have a **16 MiB serialized UTF-8 limit**. JSON preflights exact output size including two-space indentation and the final newline before pretty-printing. CSV counts quoted cells, formula prefixes, separators, line endings and repeated provenance. Encoding stops before assembling an oversized result or creating an export file; labels, warnings and records are never silently trimmed. `REVIEW_TOO_LARGE`, `REVIEW_TOO_DEEP` and `REVIEW_EXPORT_TOO_LARGE` return HTTP 413 (or an MCP tool error). Select fewer records or try the other format: CSV repeats provenance, while JSON indentation can amplify wide nested records. Partial write failures close their handle and remove only the attempt's own temporary file; original snapshots and earlier exports are retained.
+
+There is no cross-snapshot/fuzzy deduplication, automatic change-only feed, media download, encryption, signature or recall of exported copies. The dashboard's 64 KiB request cap also applies. These new read/depth/output caps apply to the reviewed workflow, not unchanged raw exports. MCP hosts receive preview records, including unselected ones, so a hosted assistant is not an offline processing guarantee. The dashboard token and local filesystem boundaries remain single-operator protections, not multi-user roles.
+
+[Source-linked verification and limits](docs/REVIEW_EXPORT_VERIFICATION.md). Actual isolated synthetic captures:
+
+![Reviewed research export on desktop](docs/review-export-1440.png)
+
+![Reviewed research export on mobile](docs/review-export-390.png)
 
 ### Repeat a saved search
 
@@ -175,7 +225,7 @@ For evidence-backed assessments, copy an observed post's text and original URL i
 | Session        | `x_session_open`, `x_session_status`, `x_session_close`, `x_screenshot`                                                          |
 | Read           | `x_search`, `x_timeline`, `x_profile`, `x_user_posts`, `x_thread`, `x_bookmarks`, `x_connections`, `x_notifications`, `x_trends` |
 | Saved searches | `x_saved_search_save`, `x_saved_search_list`, `x_saved_search_run`                                                               |
-| Artifacts      | `x_snapshot_list`, `x_snapshot_read`, `x_snapshot_compare`, `x_export`                                                           |
+| Artifacts      | `x_snapshot_list`, `x_snapshot_read`, `x_snapshot_compare`, `x_export`, `x_review_export`                                        |
 | Actions        | `x_action_prepare`, `x_action_execute`, `x_action_cancel`, `x_action_receipt`                                                    |
 
 There is also a `research-x` prompt and the `x-browser://guide` resource.
@@ -241,9 +291,18 @@ npx playwright install --no-shell chromium
 npm run check
 ```
 
-The X adapter tests use synthetic fixtures in real Chromium and intercept their X requests. The dashboard browser suite starts an isolated temporary backend with a simulated X browser adapter and exercises real dashboard HTTP routes and storage. Neither suite posts to a real X account. To use another installed Chromium binary for the adapter tests, set `TEST_BROWSER_EXECUTABLE` to its absolute path.
+The X adapter tests use synthetic fixtures in real Chromium and intercept their X requests. The dashboard browser suite starts an isolated temporary backend with a simulated X browser adapter and exercises real dashboard HTTP routes and storage. Neither suite posts to a real X account. To use another installed Chromium binary for the adapter tests, set `TEST_BROWSER_EXECUTABLE` to its absolute path. For dashboard tests, use `PLAYWRIGHT_CHANNEL=chrome` or `msedge`; `X_BROWSER_TEST_PORT` overrides their default isolated port 8794.
 
-`npm run check` runs both builds, 41 adapter/core/HTTP tests, a shared MCP/dashboard protocol test and six dashboard browser workflows. The browser suite checks five widths (320, 390, 768, 1024 and 1440 px), desktop/phone automated accessibility, keyboard navigation, saved setup, collections, downloads and action confirmation. Use `npm run build:dashboard` after frontend edits, then restart the dashboard to load the new asset manifest. Vite source is in `dashboard/src/`; generated assets in `dashboard-dist/` are excluded from Git.
+On macOS with installed Chrome, this runs the complete offline suite without downloading another browser or accessing an existing browser profile:
+
+```sh
+TEST_BROWSER_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+PLAYWRIGHT_CHANNEL=chrome X_BROWSER_TEST_PORT=5315 npm run check
+```
+
+To inspect only the synthetic dashboard manually after building, run `X_BROWSER_TEST_PORT=5316 npx tsx test/dashboard-fixture.ts` and open `http://127.0.0.1:5316`. That fixture uses a simulated adapter even for its session/action buttons, has temporary local data, and cleans up on Ctrl-C. Do not run it against normal user data. This is a test harness, not evidence of live X compatibility.
+
+`npm run check` runs both builds, **67 adapter/core/HTTP tests**, a shared MCP/dashboard protocol test (25 tools) and **10 dashboard browser workflows**. The browser suite checks five widths (320, 390, 768, 1024 and 1440 px), desktop/phone automated accessibility, keyboard navigation, saved setup, collections, downloads and action confirmation. The reviewed-export cases add stale recovery, empty/conflicting source refusal, explicit selection, note/acknowledgement gating, actual JSON/CSV contents and desktop/mobile captures. Store regressions additionally exercise inert-key preservation, limit-plus-one reads during file growth, handle cleanup, link swaps, exact CSV/JSON byte accounting, large-label/warning amplification, 64-container acceptance, 10,000-container refusal and pretty-JSON amplification. Use `npm run build:dashboard` after frontend edits, then restart the dashboard to load the new asset manifest. Vite source is in `dashboard/src/`; generated assets in `dashboard-dist/` are excluded from Git.
 
 ## Project structure and contribution
 

@@ -19,6 +19,8 @@ playwright/.auth/
 *.har
 *.png
 !dashboard/public/research-desk.png
+!docs/review-export-1440.png
+!docs/review-export-390.png
 *.webm
 storage-state*.json
 cookies*.json

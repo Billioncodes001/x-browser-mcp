@@ -1,8 +1,11 @@
-import { mkdir, readFile, readdir, realpath, rename, writeFile, unlink } from 'node:fs/promises';
+import { mkdir, readFile, readdir, realpath, rename, writeFile, unlink, open, lstat } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { relative, resolve, sep } from 'node:path';
 import { nameSchema } from './validation.js';
 import type { Collection, RecordData } from './types.js';
+import { previewReview, reviewedPacket, reviewedJson, reviewCsvRows, reviewOptionsSchema, REVIEW_SNAPSHOT_MAX_BYTES, REVIEW_CSV_MAX_BYTES, snapshotTooLarge, type ReviewOptions } from './review-export.js';
+import { XBrowserError } from './errors.js';
 
 export type Snapshot = { id: string; label?: string; data: Collection };
 export type SavedSearch = { name: string; query: string; tab: 'latest' | 'top' | 'people' | 'photos' | 'videos'; limit: number; maxScrolls: number; lastSnapshotId?: string };
@@ -17,10 +20,28 @@ export function csvCell(value: unknown): string {
   if (/^\s*[=+\-@]/.test(s) || /^[\t\r\n]/.test(s)) s = "'" + s;
   return '"' + s.replace(/"/g, '""') + '"';
 }
-export function toCsv(items: RecordData[]): string {
-  if (!items.length) return '"id"\r\n';
-  const columns = [...new Set(items.flatMap(v => Object.keys(v)))];
-  return [columns.map(csvCell).join(','), ...items.map(row => columns.map(c => csvCell(row[c])).join(','))].join('\r\n') + '\r\n';
+export function toCsv(items: RecordData[], maxBytes = Infinity): string {
+  const columns = items.length ? [...new Set(items.flatMap(v => Object.keys(v)))] : ['id'];
+  const lines: string[] = [];
+  let bytes = 0;
+  const addRow = (values: unknown[]) => {
+    const cells: string[] = [];
+    let rowBytes = 2;
+    for (const value of values) {
+      const cell = csvCell(value);
+      rowBytes += Buffer.byteLength(cell) + (cells.length ? 1 : 0);
+      if (bytes + rowBytes > maxBytes)
+        throw new XBrowserError('REVIEW_EXPORT_TOO_LARGE', `CSV exceeds the ${maxBytes}-byte output limit after repeating provenance. Select fewer records or use JSON. No export was written.`);
+      cells.push(cell);
+    }
+    if (bytes + rowBytes > maxBytes)
+      throw new XBrowserError('REVIEW_EXPORT_TOO_LARGE', `CSV exceeds the ${maxBytes}-byte output limit. No export was written.`);
+    bytes += rowBytes;
+    lines.push(cells.join(',') + '\r\n');
+  };
+  addRow(columns);
+  for (const row of items) addRow(columns.map(c => row[c]));
+  return lines.join('');
 }
 export function compareSnapshots(before: Snapshot, after: Snapshot) {
   if (before.data.kind !== after.data.kind || before.data.sourceUrl !== after.data.sourceUrl || before.data.sourceKey !== after.data.sourceKey) throw new Error('Compare snapshots of the same source, selected tab, and record kind');
@@ -105,5 +126,47 @@ export class ArtifactStore {
     ].join('\n');
     await writeFile(path, body, { mode: 0o600, flag: 'wx' });
     return { path, format, snapshotId: id, count: snapshot.data.items.length, bytes: Buffer.byteLength(body) };
+  }
+  async reviewPreview(id: string) {
+    const path = await this.path('snapshots', `${validId(id)}.json`);
+    const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+    let bytes: Buffer;
+    try {
+      const info = await file.stat();
+      if (!info.isFile()) throw new XBrowserError('REVIEW_INVALID_FILE', 'The saved snapshot must be a regular file.');
+      const named = await lstat(path);
+      if (named.isSymbolicLink() || named.dev !== info.dev || named.ino !== info.ino || await realpath(path) !== path)
+        throw new Error('Refusing a linked or replaced artifact path');
+      if (info.size > REVIEW_SNAPSHOT_MAX_BYTES) throw snapshotTooLarge();
+      const chunks: Buffer[] = [];
+      let length = 0;
+      // Stat is only an early rejection. The read budget also holds if the file grows.
+      while (length <= REVIEW_SNAPSHOT_MAX_BYTES) {
+        const chunk = Buffer.allocUnsafe(Math.min(65536, REVIEW_SNAPSHOT_MAX_BYTES + 1 - length));
+        const { bytesRead } = await file.read(chunk, 0, chunk.length, length);
+        if (!bytesRead) break;
+        length += bytesRead;
+        if (length > REVIEW_SNAPSHOT_MAX_BYTES) throw snapshotTooLarge();
+        chunks.push(chunk.subarray(0, bytesRead));
+      }
+      bytes = Buffer.concat(chunks, length);
+    } finally { await file.close(); }
+    return previewReview(bytes, id);
+  }
+  async reviewedExport(id: string, input: ReviewOptions) {
+    const options = reviewOptionsSchema.parse(input);
+    const packet = reviewedPacket(await this.reviewPreview(id), options);
+    const body = options.format === 'json' ? reviewedJson(packet) : toCsv(reviewCsvRows(packet), REVIEW_CSV_MAX_BYTES);
+    const path = await this.path('exports', `${id}-reviewed-${randomUUID()}.${options.format}`);
+    const temporary = await this.path('exports', `${randomUUID()}.tmp`);
+    let created = false;
+    try {
+      const file = await open(temporary, 'wx', 0o600);
+      created = true;
+      try { await file.writeFile(body); } finally { await file.close(); }
+      await rename(temporary, path);
+    } catch (error) { if (created) await unlink(temporary).catch(() => undefined); throw error; }
+    return { path, format: options.format, snapshotId: id, count: packet.records.length,
+      bytes: Buffer.byteLength(body), sourceDigest: packet.provenance.snapshotDigest, warnings: packet.warnings };
   }
 }

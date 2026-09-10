@@ -48,6 +48,7 @@ import "@fontsource-variable/newsreader/wght-italic.css";
 import "./styles.css";
 import type { PreparedAction, SessionState, RecordData } from "../../src/types";
 import type { SavedSearch, Snapshot } from "../../src/store";
+import { ReviewedExport } from "./review-export";
 
 type Summary = {
   id: string;
@@ -1446,6 +1447,7 @@ function SnapshotPage({ id }: { id: string }) {
           <Notice key={i}>{w}</Notice>
         ))}
       </section>
+      <ReviewedExport key={s.id} id={s.id} request={request} />
       <section className="card">
         <Section
           title="Collected records"

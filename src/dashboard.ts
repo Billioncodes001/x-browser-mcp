@@ -10,6 +10,7 @@ import { errorInfo, XBrowserError } from './errors.js';
 import { preferencesSchema, preferenceEnvironment } from './config.js';
 import { actionSchema, handleSchema, limitSchema, nameSchema, scrollSchema } from './validation.js';
 import { compareSnapshots } from './store.js';
+import { reviewOptionsSchema } from './review-export.js';
 
 const defaultAssets = fileURLToPath(new URL('../dashboard-dist/', import.meta.url));
 const readSchema = z.object({ source: z.enum(['search','timeline','profile_posts','thread','bookmarks','connections','notifications','trends']), query: z.string().max(1000).optional(), handle: z.string().max(16).optional(), url: z.string().max(300).optional(), tab: z.string().max(30).optional(), limit: limitSchema, maxScrolls: scrollSchema }).strict();
@@ -92,6 +93,14 @@ export async function startDashboard(service: XService, options: { port?: number
           case 'POST /api/searches/run': value = await service.runSearch(z.object({name:nameSchema}).strict().parse(data).name); break;
           case 'POST /api/searches/delete': value = await service.queue.run(()=>service.store.deleteSearch(z.object({name:nameSchema}).strict().parse(data).name)); break;
           case 'GET /api/snapshot': value = await service.store.snapshot(z.string().uuid().parse(url.searchParams.get('id'))); break;
+          case 'GET /api/review-export': value = await service.store.reviewPreview(z.string().uuid().parse(url.searchParams.get('id'))); break;
+          case 'POST /api/review-export': {
+            const args = z.object({id:z.string().uuid(),review:reviewOptionsSchema}).strict().parse(data);
+            const exported = await service.store.reviewedExport(args.id,args.review);
+            const bytes = await readFile(exported.path);
+            res.writeHead(200,{'Content-Type':exported.format === 'json' ? 'application/json' : 'text/csv; charset=utf-8',
+              'Content-Disposition':`attachment; filename="x-reviewed-${args.id}.${exported.format}"`});res.end(bytes);return;
+          }
           case 'POST /api/compare': { const args = z.object({before:z.string().uuid(),after:z.string().uuid()}).strict().parse(data); value = compareSnapshots(await service.store.snapshot(args.before),await service.store.snapshot(args.after)); break; }
           case 'POST /api/export': {
             const args = z.object({id:z.string().uuid(),format:z.enum(['json','csv','md'])}).strict().parse(data);
@@ -114,7 +123,7 @@ export async function startDashboard(service: XService, options: { port?: number
     } catch (error) {
       const missing = (error as NodeJS.ErrnoException).code === 'ENOENT';
       const info = error instanceof z.ZodError ? {code:'INVALID_INPUT',message:error.issues.map(i=>`${i.path.join('.') || 'Request'}: ${i.message}`).join(';').slice(0,600)} : errorInfo(error);
-      if (!res.headersSent) json(missing ? 404 : info.code === 'BODY_TOO_LARGE' ? 413 : info.code === 'SESSION_OPEN' || info.code === 'ENVIRONMENT_OVERRIDE' ? 409 : 400,missing ? {message:'The requested local record was not found.'} : info);
+      if (!res.headersSent) json(missing ? 404 : ['BODY_TOO_LARGE','REVIEW_TOO_LARGE','REVIEW_TOO_DEEP','REVIEW_EXPORT_TOO_LARGE'].includes(info.code) ? 413 : ['SESSION_OPEN','ENVIRONMENT_OVERRIDE','REVIEW_STALE','CONFLICTING_DUPLICATE'].includes(info.code) ? 409 : 400,missing ? {message:'The requested local record was not found.'} : info);
       else res.end();
     } finally {if (accepted) requests--;}
   });

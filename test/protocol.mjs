@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { ArtifactStore } from '../dist/store.js';
 
 const data = await mkdtemp(resolve(tmpdir(), 'x-browser-mcp-protocol-'));
 const client = new Client({ name:'protocol-test',version:'1.0.0' });
@@ -38,7 +39,21 @@ try {
   assert.match(resource.contents[0].text,/untrusted/);
   const prompt = await client.getPrompt({name:'research-x',arguments:{query:'hello'}});
   assert.match(prompt.messages[0].content.text,/Do not perform account actions/);
-  console.log(`Protocol test passed: ${tools.length} tools, resource, prompt, validation, and local search persistence.`);
+  const inertRecord=JSON.parse('{"id":"synthetic-1","text":"Synthetic reviewed record","__proto__":{"evidence":"inert field"}}');
+  const snapshot=await new ArtifactStore(data).saveSnapshot({kind:'posts',sourceUrl:'https://x.com/search?q=synthetic',capturedAt:'2026-09-09T12:00:00Z',complete:false,stopReason:'blocked',scrolls:0,warnings:['Offline synthetic evidence only'],items:[inertRecord,{id:'synthetic-2',text:'Excluded synthetic record'}]});
+  const preview=await client.callTool({name:'x_review_export',arguments:{snapshotId:snapshot.id}});
+  assert.notEqual(preview.isError,true);assert.equal(preview.structuredContent.uniqueCount,2);
+  assert.deepEqual(preview.structuredContent.records[0].record,inertRecord);
+  const args={snapshotId:snapshot.id,review:{snapshotDigest:preview.structuredContent.snapshotDigest,recordIds:['synthetic-1'],note:'Selected synthetic record for offline human review.',acknowledgedPartial:true,format:'json'}};
+  const exported=await client.callTool({name:'x_review_export',arguments:args});
+  assert.notEqual(exported.isError,true);
+  const packet=JSON.parse(await readFile(exported.structuredContent.path,'utf8'));
+  assert.equal(packet.records.length,1);assert.equal(packet.records[0].record.id,'synthetic-1');assert.equal(packet.provenance.complete,false);assert.equal(packet.selection.excludedUniqueCount,1);
+  assert.deepEqual(packet.records[0].record,inertRecord);assert.equal(Object.hasOwn(Object.prototype,'evidence'),false);
+  const stale=await client.callTool({name:'x_review_export',arguments:{...args,review:{...args.review,snapshotDigest:'0'.repeat(64)}}});
+  assert.equal(stale.isError,true);assert.equal(stale.structuredContent.code,'REVIEW_STALE');
+  assert.equal((await client.callTool({name:'x_session_status',arguments:{}})).structuredContent.state,'closed');
+  console.log(`Protocol test passed: ${tools.length} tools, resource, prompt, validation, local search persistence and offline reviewed export with stale-source refusal.`);
 } finally {
   await client.close();
   await rm(data,{recursive:true,force:true});
